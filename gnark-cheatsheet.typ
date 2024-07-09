@@ -39,7 +39,11 @@
   level: 3
 ): it => block(width: 100%, height: 6pt)[
   #set align(center)
-  #set text(11pt, font: "Arial", style: "italic", weight: "regular")
+  #set text(11pt, 
+    font: "Arial", 
+    fill: rgb("#284ecb").darken(20%),
+    style: "italic",
+    weight: "regular")
   --- #it.body ---
 ]
 
@@ -51,7 +55,7 @@
   go: (name: "", icon:rect(),  color: luma(200)),
 ),
 display-icon:false,
-stroke-color: rgb("#CE412B"),
+stroke-color: rgb("#254cca"),
 stroke-width: 0.5pt,
 enable-numbers: false,
 )
@@ -90,15 +94,17 @@ enable-numbers: false,
 // ]
 // )
 
-== Installing Gnark
+== Getting started
+
+=== Installing Gnark
 
 ```bash
 go get github.com/consensys/gnark@latest
 ```
 
-\*`Var` is abbreviated for `frontend.Variable`
+\*`frontend.Variable` is abbreviated as `Var`
 
-== Define circuit
+=== Define circuit
 
 ```go
 type Circuit struct {
@@ -113,8 +119,6 @@ func (c *Circuit) Define(
 }
 ```
 
-== Compile and prove
-
 === Compile
 
 ```go
@@ -127,7 +131,7 @@ w, _ := frontend.NewWitness(vals, cur)
 pubw, _ := w.Public()
 ```
 
-=== Groth16
+=== Prove: Groth16
 
 ```go
 pk, vk, _ := groth16.Setup(cs)
@@ -135,7 +139,7 @@ proof, _ := groth16.Prove(cs, pk, w)
 err := groth16.Verify(proof, vk, pubw)
 ```
 
-=== PlonK
+=== Prove: PlonK
 
 ```go
 srs, lag, _ := unsafekzg.NewSRS(cs)
@@ -146,19 +150,34 @@ err := plonk.Verify(proof, vk, pubw)
 
 == API
 
+=== Assertions
+
+```go
+// fails if i1 != i2
+AssertIsEqual(i1, i2 Var)
+// fails if i1 == i2
+AssertIsDifferent(i1, i2 Var)
+// fails if v != 0 and v != 1
+AssertIsBoolean(i1 Var)
+// fails if v ∉ {0,1,2,3}
+AssertIsCrumb(i1 Var)
+// fails if v > bound.
+AssertIsLessOrEqual(v Var, bound Var)
+```
+
 === Arithemetics
 
 ```go
 // = i1 + i2 + ... in
 Add(i1, i2 Var, in ...Var) Var
 // a = a + (b * c)
-Mulcc(a,b, c Var) Var
+MulAcc(a,b, c Var) Var
 Neg(i1 Var) Var // -i. 
 // = i1 - i2 - ... in
 Sub(i1, i2 Var, in ...Var) Var
 // = i1 * i2 * ... in
 Mul(i1, i2 Var, in ...Var) Var
-// i1 /i2. 0 if i1 = i2 = 0
+// i1 /i2. =0 if i1 = i2 = 0
 DivUnchecked(i1, i2 Var) Var
 Div(i1, i2 Var) Var // = i1 / i2
 Inverse(i1 Var) Var // = 1 / i1
@@ -188,36 +207,20 @@ IsZero(i1 Var) Var
 Cmp(i1, i2 Var) Var
 ```
 
-=== Assertions
-
-```go
-// fails if i1 != i2
-AssertIsEqual(i1, i2 Var)
-// fails if i1 == i2
-AssertIsDifferent(i1, i2 Var)
-// fails if v != 0 and v != 1
-AssertIsBoolean(i1 Var)
-// fails if v ∉ {0,1,2,3}
-AssertIsCrumb(i1 Var)
-// fails if v > bound.
-AssertIsLessOrEqual(v Var, bound Var)
-```
-
 === Debug
 
 Run the program with `-tags=debug` to display a more verbose stack trace.
 
 ```go
-// behaves like fmt.Println
-Println(a ...Var)
+Println(a ...Var) //like fmt.Println
 ```
 
-=== Advanced
+// === Advanced
 
-```go
-// for advanced circuit development
-Compiler() Compiler
-```
+// ```go
+// // for advanced circuit development
+// Compiler() Compiler
+// ```
 
 // ```go
 // // NewHint is a shortcut to api.Compiler().NewHint()
@@ -312,6 +315,8 @@ pubw, _ := witness.Public()
 ```go
 f, _ := os.Create("verifier.sol")
 err = vk.ExportSolidity(f)
+_p, _ := proof.(interface{MarshalSolidity() []byte})
+proofStr := hex.EncodeToString(_p.MarshalSolidity())
 ```
 
 == Concepts
@@ -349,6 +354,7 @@ err = vk.ExportSolidity(f)
     columns: (auto, auto, auto, auto),
     inset: 3pt,
     align: horizon,
+    stroke: 0.5pt + rgb("#bbb"),
     table.header(
       [*Schema*],
       [*CRS/SRS*],
