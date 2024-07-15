@@ -98,7 +98,7 @@ enable-numbers: false,
 
 === Installing Gnark
 
-```bash
+```sh
 go get github.com/consensys/gnark@latest
 ```
 
@@ -378,6 +378,7 @@ proofStr := hex.EncodeToString(_p.MarshalSolidity())
 === Resources
 
 - https://docs.gnark.consensys.io/
+- https://play.gnark.io/
 
 // == Unit test
 
