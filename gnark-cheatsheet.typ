@@ -108,14 +108,14 @@ go get github.com/consensys/gnark@latest
 
 ```go
 type Circuit struct {
-    PreImage Var
-    Hash     Var `gnark:",public"`
+    PreImage Var `gnark:",secret"`
+    Hash     Var `gnark:"hash,public"`
 }
 func (c *Circuit) Define(
            api frontend.API) error {
-    m, _ := mimc.NewMiMC(api.Curve())
-    api.AssertIsEqual(c.Hash, 
-          m.Hash(cs, c.PreImage))
+    m, _ := mimc.NewMiMC(api)
+    m.Write(c.PreImage)
+    api.AssertIsEqual(c.Hash, m.Sum())
 }
 ```
 
@@ -193,12 +193,12 @@ FromBinary(b ...Var) Var
 Xor(a, b Var) Var // a ^ b
 Or(a, b Var) Var // a | b
 And(a, b Var) Var // a & b
-// performs a 2-bit lookup
-Lookup2(b0,b1 Var,i0,i1,i2,i3 Var) Var
 ```
 
 === Flow
 ```go
+// performs a 2-bit lookup
+Lookup2(b0,b1 Var,i0,i1,i2,i3 Var) Var
 // if b is true, yields i1 else i2
 Select(b Var, i1, i2 Var) Var
 // returns 1 if a is zero, 0 otherwise
@@ -237,47 +237,58 @@ Println(a ...Var) //like fmt.Println
 === MiMC Hash
 
 ```go
-f, _ := mimc.NewMiMC(api.Curve())
-h := f.Hash(cs, circuit.Data)
+fMimc, _ := mimc.NewMiMC()
+fMimc.Write(circuit.Data)
+h := fMimc.Sum()
 ```
 
 === EdDSA Signature
 
 ```go
+import t "github.com/consensys/gnark-crypto/ecc/twistededwards"
+import te "github.com/consensys/gnark/std/algebra/native/twistededwards"
 type Circuit struct {
     pub eddsa.PublicKey
     sig eddsa.Signature
     msg frontend.Variable
 }
-cur, _ := twistededwards.NewEdCurve(api.Curve())
-c.PublicKey.Curve = cur
-eddsa.Verify(cs, c.sig, c.msg, c.pub)
+cur, _ := te.NewEdCurve(api, t.BN254)
+eddsa.Verify(cur, c.sig, c.msg, c.pub, &fMimc)
 ```
 
 === Merkle Proof
 
 ```go
 type Circuit struct {
-    Root         frontend.Variable
-    Path, Helper []frontend.Variable
+	M    merkle.MerkleProof
+	Leaf frontend.Variable
 }
-hFunc, _ := mimc.NewMiMC(api.Curve())
-merkle.VerifyProof(cs, hFunc, c.Root, c.Path, c.Helper)
+c.M.VerifyProof(api, &hFunc, c.Leaf)
 ```
 
-=== zk-SNARK Verifier
+== Misc
 
-```go
-type Circuit struct {
-    InnerProof   Proof
-    InnerVk      VerifyingKey
-    PublicInputs []frontend.Variable
-}
-groth16.Verify(api, c.InnerVk, c.InnerProof, c.PublicInputs)
-```
+// === Serialization
 
-== Serialization
-
+// ```go
+// cur := ecc.BN254
+// // CS Serialize
+// var buf bytes.Buffer
+// cs.WriteTo(&buf)
+// // CS Deserialize
+// cs := groth16.NewCS(cur)
+// cs.ReadFrom(&buf)
+// // Witness Serialize
+// w, _ := frontend.NewWitness(&val, cur)
+// data, _ := w.MarshalBinary()
+// json, _ := w.MarshalJSON()
+// // Witness Deserialize
+// w, _ := witness.New(cur)
+// err := w.UnmarshalBinary(data)
+// w, _ := witness.New(cur, ccs.GetSchema())
+// err := w.UnmarshalJSON(json)
+// pubw, _ := witness.Public()
+// ```
 === CS Serialize
 
 ```go
@@ -315,8 +326,13 @@ pubw, _ := witness.Public()
 ```go
 f, _ := os.Create("verifier.sol")
 err = vk.ExportSolidity(f)
+```
+
+=== Export Plonk Proof
+
+```go
 _p, _ := proof.(interface{MarshalSolidity() []byte})
-proofStr := hex.EncodeToString(_p.MarshalSolidity())
+proofStr := "0x" + hex. EncodeToString(_p.MarshalSolidity())
 ```
 
 == Concepts
@@ -347,8 +363,11 @@ proofStr := hex.EncodeToString(_p.MarshalSolidity())
   ]
 )
 
+#let m1=math.op($bold(m_1)$)
+#let m2=math.op($bold(m_2)$)
+
 #text(
-  size: 7pt,
+  size: 6pt,
   [
     #table(
     columns: (auto, auto, auto, auto),
@@ -362,23 +381,70 @@ proofStr := hex.EncodeToString(_p.MarshalSolidity())
       [*Verifier Work*],
     ),
     [Groth16],
-    $3n+m GG_1$,
+    $(3n+m) GG_1$,
     $2 GG_1 + 1 GG_2$,
-    $3P + ell GG_1 exp$,
+    $3P + ell m1$,
     [PlonK],
-    $n+a GG_1+GG_2$,
+    $(n+a) GG_1+GG_2$,
     $9GG_1+7FF$,
-    $2P+18GG_1 exp$,
+    $2P+18 m1$,
+    [Polymath],
+    $(tilde(m) + 12 tilde(n)) GG_1$,
+    $3 GG_1+1FF$,
+    $2P + 2 m1 + m2 + tilde(ell) FF$,
     )
-    \*$m=$wire num, $n=$multiplication gates, $a=$addition gates, $P=$pairing, $ell=$pub inputs num, PlonK is universal setup
+    \*$m=$wire num, $n=$multiplication gates,
+    $tilde(m) approx 2m$, $tilde(n) approx 2n$,
+    $bold(m_L) = GG_L exp$.
+    $a=$addition gates, $P=$pairing, $ell=$pub inputs num, $tilde(ell) = O(ell log ell)$ PlonK is universal setup
   ]
   
 )
+
+// REF: Gabizon, Ariel, Zachary J. Williamson, and Oana Ciobotaru. “PLONK: Permutations over Lagrange-Bases for Oecumenical Noninteractive Arguments of Knowledge,” 2019. https://eprint.iacr.org/2019/953.
 
 === Resources
 
 - https://docs.gnark.consensys.io/
 - https://play.gnark.io/
+- https://zkshanghai.xyz/
+
+#colbreak()
+
+== Selector
+
+```go
+import "github.com/consensys/gnark/std/selector"
+```
+
+=== Slice
+
+```go
+// out[i] = i ∈ [s, e) ? in[i] : 0
+Slice(api, s, e Var, in []Var) []Var
+// out[i] = rs ? (i ≥ p ? in[i] : 0)
+//             : (i < p ? in[i] : 0)
+Partition(api, p Var, rs bool, in []Var) []Var
+// out[i] = i < sp ? sv : ev
+stepMask(api, outlen int, sp, sv, ev Var) []Var
+```
+
+=== Mux
+
+```go
+// out = in[b[0]+b[1]*2+b[2]*4+...]
+BinaryMux(api, selBits, in []Var) Var
+// out = vs[i] if ks[i] == qkey
+Map(api, qkey Var, ks, vs []Var) Var
+// out = in[sel]
+Mux(api, sel Var, in ...Var) Var
+// out[i] = ks[i] == k ? 1 : 0
+KeyDecoder(api, k Var, ks []Var) []Var
+// out[i] = i == s ? 1 : 0
+Decoder(api, n int, sel Var) []Var
+// out = a1*b1 + a2*b2 + ...
+dotProduct(api, a, b []Var) Var
+```
 
 // == Unit test
 
@@ -411,3 +477,8 @@ proofStr := hex.EncodeToString(_p.MarshalSolidity())
 // }
 // cs.AssertIsEqual(Σbi, a)
 // ```
+
+
+// TODO: how to convert byte[] to number to equal to number in-circuit print by api.Println
+
+// TODO: selctor under github.com/consensys/gnark/std/selector
