@@ -55,13 +55,13 @@
   go: (name: "", icon:rect(),  color: luma(200)),
 ),
 display-icon: false,
-stroke: 0.5pt + rgb("#254cca"),
 number-format: none,
 zebra-fill: rgb("#f9f9f9"),
 // lang-format: none,
 )
 
-#codly(stroke: 0.5pt + rgb("#254cca"))
+#let in_circuit_color = 0.5pt + rgb("#254cca")
+#let out_circuit_color = 0.5pt + rgb("#29851c")
 
 #show: rest => columns(3, gutter: 8pt, rest)
 
@@ -101,6 +101,7 @@ zebra-fill: rgb("#f9f9f9"),
 
 === Installing Gnark
 
+#codly(stroke: out_circuit_color)
 ```sh
 go get github.com/consensys/gnark@latest
 ```
@@ -108,8 +109,9 @@ go get github.com/consensys/gnark@latest
 \*`frontend.Variable` is abbreviated as `Var`
 #codly(display-name: false)
 
-=== Define circuit
+=== Define Circuit
 
+#codly(stroke: in_circuit_color)
 ```go
 import "github.com/consensys/gnark/frontend"
 type Circuit struct {
@@ -126,6 +128,7 @@ func (c *Circuit) Define(
 
 === Compile
 
+#codly(stroke: out_circuit_color)
 ```go
 var mimcCircuit Circuit
 cur := ecc.BN254.ScalarField()
@@ -154,6 +157,8 @@ err := plonk.Verify(proof, vk, pubw)
 ```
 
 == API
+
+#codly(stroke: in_circuit_color)
 
 === Assertions
 
@@ -395,6 +400,8 @@ dotProduct(a, b []Var) Var
 
 == Serialization
 
+#codly(stroke: out_circuit_color)
+
 // === Serialization
 
 // ```go
@@ -477,6 +484,65 @@ for i := 0; i < 8; i++ {
     b[32*i : 32*(i+1)]).String()
 }
 str := "["+strings.Join(p[:],",")+"]"
+```
+
+== Standard library
+
+=== MiMC Hash
+
+```go
+import "github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
+fMimc := mimc.NewMiMC()
+fMimc.Write(buf)
+h := fMimc.Sum(nil)
+```
+
+=== EdDSA Signature
+
+```go
+import "math/rand"
+import t "github.com/consensys/gnark-crypto/ecc/twistededwards"
+import "github.com/consensys/gnark-crypto/hash"
+curve := t.BN254
+ht := hash.MIMC_BN254
+seed := time.Now().Unix()
+rnd := rand.New(rand.NewSource(seed))
+s, _ := eddsa.New(curve, rnd)
+sig, _ := s.Sign(msg, ht.New())
+pk := s.Public()
+v, _ := s.Verify(sig, msg, ht.New())
+c.PublicKey.Assign(curve, pk.Bytes())
+c.Signature.Assign(curve, sig)
+```
+
+=== Merkle Proof
+
+```go
+import mt "github.com/consensys/gnark-crypto/accumulator/merkletree"
+depth := 5
+num := uint64(2 << (depth - 1))
+seg := 32
+mod := ecc.BN254.ScalarField()
+// Create tree by random data
+mlen := len(mod.Bytes())
+var buf bytes.Buffer
+for i := 0; i < int(num); i++ {
+  leaf, _:= rand.Int(rand.Reader, mod)
+  b := leaf.Bytes()
+  buf.Write(make([]byte, mlen-len(b)))
+  buf.Write(b)
+}
+// build merkle tree proof and verify
+hGo := hash.MIMC_BN254.New()
+idx := uint64(1)
+root, path, _, _ := mt.BuildReaderProof(&buf, hGo, seg, idx)
+verified := mt.VerifyProof(hGo, root, path, idx, num)
+c.Leaf = idx
+c.M.RootHash = root
+c.M.Path = make([]Var, depth+1)
+for i := 0; i < depth+1; i++ {
+  c.M.Path[i] = path[i]
+}
 ```
 
 // == Unit test
