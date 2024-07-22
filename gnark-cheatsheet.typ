@@ -246,7 +246,7 @@ Println(a ...Var) //like fmt.Println
 // ConstantValue(v Variable) (*big.Int, bool)
 // ```
 
-== Standard library
+== Standard Library
 
 === MiMC Hash
 
@@ -488,7 +488,7 @@ for i := 0; i < 8; i++ {
 str := "["+strings.Join(p[:],",")+"]"
 ```
 
-== Standard library
+== Standard Library
 
 === MiMC Hash
 
