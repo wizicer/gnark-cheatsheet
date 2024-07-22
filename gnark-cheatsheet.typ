@@ -47,18 +47,21 @@
   --- #it.body ---
 ]
 
-#import "@preview/codly:0.2.1": *
+#import "@preview/codly:1.0.0": *
 
 #show: codly-init.with()
 #codly(languages: (
   // go: (name: "", icon:rect(),  color: rgb("#5daad4")),
   go: (name: "", icon:rect(),  color: luma(200)),
 ),
-display-icon:false,
-stroke-color: rgb("#254cca"),
-stroke-width: 0.5pt,
-enable-numbers: false,
+display-icon: false,
+stroke: 0.5pt + rgb("#254cca"),
+number-format: none,
+zebra-fill: rgb("#f9f9f9"),
+// lang-format: none,
 )
+
+#codly(stroke: 0.5pt + rgb("#254cca"))
 
 #show: rest => columns(3, gutter: 8pt, rest)
 
@@ -103,10 +106,12 @@ go get github.com/consensys/gnark@latest
 ```
 
 \*`frontend.Variable` is abbreviated as `Var`
+#codly(display-name: false)
 
 === Define circuit
 
 ```go
+import "github.com/consensys/gnark/frontend"
 type Circuit struct {
     PreImage Var `gnark:",secret"`
     Hash     Var `gnark:"hash,public"`
@@ -164,6 +169,8 @@ AssertIsCrumb(i1 Var)
 // fails if v > bound.
 AssertIsLessOrEqual(v Var, bound Var)
 ```
+
+#colbreak()
 
 === Arithemetics
 
@@ -237,6 +244,7 @@ Println(a ...Var) //like fmt.Println
 === MiMC Hash
 
 ```go
+import "github.com/consensys/gnark/std/hash/mimc"
 fMimc, _ := mimc.NewMiMC()
 fMimc.Write(circuit.Data)
 h := fMimc.Sum()
@@ -256,9 +264,12 @@ cur, _ := te.NewEdCurve(api, t.BN254)
 eddsa.Verify(cur, c.sig, c.msg, c.pub, &fMimc)
 ```
 
+#colbreak()
+
 === Merkle Proof
 
 ```go
+import "github.com/consensys/gnark/std/accumulator/merkle"
 type Circuit struct {
 	M    merkle.MerkleProof
 	Leaf frontend.Variable
@@ -266,73 +277,39 @@ type Circuit struct {
 c.M.VerifyProof(api, &hFunc, c.Leaf)
 ```
 
-== Misc
-
-// === Serialization
-
-// ```go
-// cur := ecc.BN254
-// // CS Serialize
-// var buf bytes.Buffer
-// cs.WriteTo(&buf)
-// // CS Deserialize
-// cs := groth16.NewCS(cur)
-// cs.ReadFrom(&buf)
-// // Witness Serialize
-// w, _ := frontend.NewWitness(&val, cur)
-// data, _ := w.MarshalBinary()
-// json, _ := w.MarshalJSON()
-// // Witness Deserialize
-// w, _ := witness.New(cur)
-// err := w.UnmarshalBinary(data)
-// w, _ := witness.New(cur, ccs.GetSchema())
-// err := w.UnmarshalJSON(json)
-// pubw, _ := witness.Public()
-// ```
-=== CS Serialize
+== Selector
 
 ```go
-var buf bytes.Buffer
-cs.WriteTo(&buf)
+import "github.com/consensys/gnark/std/selector"
 ```
 
-=== CS Deserialize
+=== Slice
 
 ```go
-cs := groth16.NewCS(ecc.BN254)
-cs.ReadFrom(&buf)
+// out[i] = i ∈ [s, e) ? in[i] : 0
+Slice(s, e Var, in []Var) []Var
+// out[i] = rs ? (i ≥ p ? in[i] : 0)
+//             : (i < p ? in[i] : 0)
+Partition(p Var, rs bool, in []Var) []Var
+// out[i] = i < sp ? sv : ev
+stepMask(outlen int, sp, sv, ev Var) []Var
 ```
 
-=== Witness Serialize
+=== Mux
 
 ```go
-w, _ := frontend.NewWitness(&assignment, ecc.BN254)
-data, _ := w.MarshalBinary()
-json, _ := w.MarshalJSON()
-```
-
-=== Witness Deserialize
-
-```go
-w, _ := witness.New(ecc.BN254)
-err := w.UnmarshalBinary(data)
-w, _ := witness.New(ecc.BN254, ccs.GetSchema())
-err := w.UnmarshalJSON(json)
-pubw, _ := witness.Public()
-```
-
-=== Export Solidity
-
-```go
-f, _ := os.Create("verifier.sol")
-err = vk.ExportSolidity(f)
-```
-
-=== Export Plonk Proof
-
-```go
-_p, _ := proof.(interface{MarshalSolidity() []byte})
-proofStr := "0x" + hex. EncodeToString(_p.MarshalSolidity())
+// out = in[b[0]+b[1]*2+b[2]*4+...]
+BinaryMux(selBits, in []Var) Var
+// out = vs[i] if ks[i] == qkey
+Map(qkey Var, ks, vs []Var) Var
+// out = in[sel]
+Mux(sel Var, in ...Var) Var
+// out[i] = ks[i] == k ? 1 : 0
+KeyDecoder(k Var, ks []Var) []Var
+// out[i] = i == s ? 1 : 0
+Decoder(n int, sel Var) []Var
+// out = a1*b1 + a2*b2 + ...
+dotProduct(a, b []Var) Var
 ```
 
 == Concepts
@@ -411,39 +388,90 @@ proofStr := "0x" + hex. EncodeToString(_p.MarshalSolidity())
 
 #colbreak()
 
-== Selector
+== Serialization
+
+// === Serialization
+
+// ```go
+// cur := ecc.BN254
+// // CS Serialize
+// var buf bytes.Buffer
+// cs.WriteTo(&buf)
+// // CS Deserialize
+// cs := groth16.NewCS(cur)
+// cs.ReadFrom(&buf)
+// // Witness Serialize
+// w, _ := frontend.NewWitness(&val, cur)
+// data, _ := w.MarshalBinary()
+// json, _ := w.MarshalJSON()
+// // Witness Deserialize
+// w, _ := witness.New(cur)
+// err := w.UnmarshalBinary(data)
+// w, _ := witness.New(cur, ccs.GetSchema())
+// err := w.UnmarshalJSON(json)
+// pubw, _ := witness.Public()
+// ```
+=== CS Serialize
 
 ```go
-import "github.com/consensys/gnark/std/selector"
+var buf bytes.Buffer
+cs.WriteTo(&buf)
 ```
 
-=== Slice
+=== CS Deserialize
 
 ```go
-// out[i] = i ∈ [s, e) ? in[i] : 0
-Slice(api, s, e Var, in []Var) []Var
-// out[i] = rs ? (i ≥ p ? in[i] : 0)
-//             : (i < p ? in[i] : 0)
-Partition(api, p Var, rs bool, in []Var) []Var
-// out[i] = i < sp ? sv : ev
-stepMask(api, outlen int, sp, sv, ev Var) []Var
+cs := groth16.NewCS(ecc.BN254)
+cs.ReadFrom(&buf)
 ```
 
-=== Mux
+=== Witness Serialize
 
 ```go
-// out = in[b[0]+b[1]*2+b[2]*4+...]
-BinaryMux(api, selBits, in []Var) Var
-// out = vs[i] if ks[i] == qkey
-Map(api, qkey Var, ks, vs []Var) Var
-// out = in[sel]
-Mux(api, sel Var, in ...Var) Var
-// out[i] = ks[i] == k ? 1 : 0
-KeyDecoder(api, k Var, ks []Var) []Var
-// out[i] = i == s ? 1 : 0
-Decoder(api, n int, sel Var) []Var
-// out = a1*b1 + a2*b2 + ...
-dotProduct(api, a, b []Var) Var
+w, _ := frontend.NewWitness(&assignment, ecc.BN254)
+data, _ := w.MarshalBinary()
+json, _ := w.MarshalJSON()
+```
+
+=== Witness Deserialize
+
+```go
+w, _ := witness.New(ecc.BN254)
+err := w.UnmarshalBinary(data)
+w, _ := witness.New(ecc.BN254, ccs.GetSchema())
+err := w.UnmarshalJSON(json)
+pubw, _ := witness.Public()
+```
+
+== Smart Contract
+
+=== Export Solidity
+
+```go
+f, _ := os.Create("verifier.sol")
+err = vk.ExportSolidity(f)
+```
+
+=== Export Plonk Proof
+
+```go
+_p, _ := proof.(interface{MarshalSolidity() []byte})
+str := "0x" + hex.EncodeToString(
+  _p.MarshalSolidity())
+```
+
+=== Export Groth16 Proof
+
+```go
+buf := bytes.Buffer{}
+_, err := proof.WriteRawTo(&buf)
+b := buf.Bytes()
+var p [8]string
+for i := 0; i < 8; i++ {
+  p[i] = new(big.Int).SetBytes(
+    b[32*i : 32*(i+1)]).String()
+}
+str := "["+strings.Join(p[:],",")+"]"
 ```
 
 // == Unit test
