@@ -337,6 +337,11 @@ dotProduct(a, b []Var) Var
     "PlonK: "
     q_l_i a_i + q_r_i b_i + q_o_i c_i + q_m_i a_i b_i + q_c_i = 0
     $
+
+    $
+    "SAP: "
+    x dot y = (x\/2 + y\/2)^2 -(x\/2 - y \/2)^2
+    $
   ]
 )
 
