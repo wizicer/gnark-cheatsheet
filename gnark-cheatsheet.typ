@@ -106,8 +106,10 @@ zebra-fill: rgb("#f9f9f9"),
 go get github.com/consensys/gnark@latest
 ```
 
-\*`frontend.Variable` is abbreviated as `Var`
+- `frontend.Variable` is abbreviated as `Var`
 #codly(display-name: false)
+- #box(stroke: in_circuit_color.paint + 1.2pt, width: 6pt, height: 6pt) is in-circuit code,
+  #box(stroke: out_circuit_color.paint + 1.2pt, width: 6pt, height: 6pt) is out-circuit code
 
 === Define Circuit
 
