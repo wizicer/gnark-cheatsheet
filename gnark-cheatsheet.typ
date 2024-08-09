@@ -336,7 +336,7 @@ dotProduct(a, b []Var) Var
   size: 8pt,
   [
     $
-    "R1CS: "
+    "Groth16: "
     cal(L) arrow(x) dot cal(R) arrow(x) = cal(O) arrow(x)
     $
 
@@ -346,7 +346,7 @@ dotProduct(a, b []Var) Var
     $
 
     $
-    "SAP: "
+    "SAP(Polymath): "
     x dot y = (x\/2 + y\/2)^2 -(x\/2 - y \/2)^2
     $
   ]
